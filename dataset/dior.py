@@ -2,6 +2,7 @@
 converting to the {boxes, labels} format torchvision's detection models expect.
 """
 import torch
+import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset
 from datasets import load_from_disk
 
@@ -57,7 +58,9 @@ class DIORDetectionDataset(Dataset):
             "iscrowd": torch.zeros((len(labels),), dtype=torch.int64),
         }
 
-        if self.transforms is not None:
+        if self.transforms is None:
+            image = TF.to_tensor(image)  # PIL -> float tensor [C,H,W], normalized to [0,1]
+        else:
             image, target = self.transforms(image, target)
 
         return image, target
