@@ -311,11 +311,11 @@ The **only intended experimental variable is the fine-tuning strategy applied to
 | Neck                         | Simple Feature Pyramid | Simple Feature Pyramid   |
 | Detector                     | Faster R-CNN           | Faster R-CNN             |
 | Fine-tuning                  | **Full fine-tuning**   | **LoRA**                 |
-| LoRA rank                    | —                      | 8                        |
-| LoRA alpha                   | —                      | 16                       |
-| LoRA target                  | —                      | Attention `qkv` / `proj` |
-| Backbone parameters          | Trainable              | Frozen except LoRA       |
-| Approx. trainable parameters | 131.3M / 133.2M        | 20.6M / 132.5M           |
+| LoRA rank                    | —                       | 8                        |
+| LoRA alpha                   | —                       | 16                       |
+| LoRA target                  | —                       | Attention `qkv` / `proj` |
+| Backbone parameters          | Trainable               | Frozen except LoRA       |
+| Approx. trainable parameters | 131.3M / 133.2M         | 20.6M / 132.5M           |
 
 The LoRA experiment introduces low-rank trainable adapters into the attention layers while keeping the original DOFA backbone weights frozen.
 
@@ -397,14 +397,28 @@ The difference is relatively small, so the result should be interpreted as **com
 
 # 14. Training Cost
 
-| Metric               | Baseline — Full FT | Modified — LoRA |
-| -------------------- | -----------------: | --------------: |
-| Approx. time / epoch |           19.5 min |        23.9 min |
-| Final training loss  |             0.4181 |          0.3987 |
+### Per-epoch time and loss
 
-Although LoRA reduces the number of trainable parameters, it did **not** reduce wall-clock training time in this implementation.
+| Epoch | Baseline loss | Baseline time | LoRA loss | LoRA time |
+| ----: | ------------: | -------------: | --------: | ---------: |
+| 0 | 0.8492 | 1173.9s | 0.8046 | 966.6s |
+| 1 | 0.7700 | 1175.9s | 0.6552 | 966.8s |
+| 2 | 0.6647 | 1175.4s | 0.5937 | 967.7s |
+| 3 | 0.5879 | 1176.1s | 0.5476 | 968.4s |
+| 4 | 0.5290 | 1175.0s | 0.5039 | 965.8s |
+| 5 | 0.4829 | 1174.0s | 0.4655 | 965.4s |
+| 6 | 0.4411 | 1172.8s | 0.4283 | 1597.9s |
+| 7 | 0.4181 | 1171.7s | 0.3987 | 1433.5s |
 
-The additional low-rank operations introduce some forward-pass overhead. Therefore, the main benefit observed here is **parameter efficiency**, rather than faster training.
+| Metric | Baseline | LoRA |
+|---|---|---|
+| Time/epoch (average, all 8 epochs) | ~19.6 min | ~18.4 min |
+| Time/epoch (epochs 0–5 only) | ~19.6 min | ~16.1 min |
+| Final training loss | 0.4181 | 0.3987 |
+
+Baseline epoch time was remarkably consistent across all 8 epochs (~19.6 min throughout). LoRA was noticeably **faster** for the first 6 epochs (~16.1 min vs. baseline's ~19.6 min) — plausibly because freezing most of the backbone reduces backward-pass work, even though the forward pass computes the same features through the full network. Epochs 6–7 saw an unexplained slowdown for LoRA (~26.6 min and ~23.9 min), which appears to be an environmental anomaly (e.g., background process or I/O contention on the instance) rather than an inherent property of LoRA, given how consistent the preceding six epochs were. Averaged across all 8 epochs, LoRA's mean epoch time (~18.4 min) was still slightly lower than the baseline's (~19.6 min).
+
+LoRA also converged to a **lower training loss at nearly every epoch**, not just at the end — see the loss-curve chart in the presentation for the full trajectory.
 
 ---
 
@@ -441,19 +455,20 @@ This may indicate a difference in RPN/detection behavior resulting from the alte
 
 The main finding is:
 
-> **LoRA achieved comparable, and slightly higher, detection performance than full fine-tuning under the constrained training setup while updating substantially fewer backbone parameters.**
+> **LoRA achieved comparable, and slightly higher, detection performance than full fine-tuning under the constrained training setup while updating substantially fewer backbone parameters, and also trained faster on average and converged to a lower loss at nearly every epoch.**
 
 Specifically:
 
 * mAP@[0.50:0.95] increased from **0.0405 → 0.0436**
 * mAP@0.50 increased from **0.0809 → 0.0875**
 * mAP@0.75 increased from **0.0357 → 0.0377**
+* Average epoch time decreased from **~19.6 min → ~18.4 min** (and was ~16.1 min for 6 of the 8 epochs)
 
 At the same time, the LoRA configuration updates a much smaller fraction of the overall model parameters.
 
-This suggests that parameter-efficient adaptation can be a viable strategy for adapting a large remote-sensing foundation model when training data and computational resources are limited.
+This suggests that parameter-efficient adaptation can be a viable strategy for adapting a large remote-sensing foundation model when training data and computational resources are limited — offering comparable or better accuracy, faster iteration in most epochs, and a much smaller set of trainable parameters.
 
-However, the performance differences are small and should not be interpreted as a definitive superiority of LoRA.
+However, the performance differences are small, two of the eight LoRA epochs showed an unexplained timing anomaly, and these results should not be interpreted as a definitive, general superiority of LoRA over full fine-tuning.
 
 ---
 
@@ -497,6 +512,10 @@ This is expected given the intentionally constrained training setup and should n
 
 The primary objective of this experiment is the **controlled comparison between full fine-tuning and LoRA**, rather than achieving a state-of-the-art DIOR score.
 
+### Unexplained training-time anomaly
+
+LoRA epochs 6 and 7 took notably longer than epochs 0–5, for reasons not fully diagnosed (possible causes include background process contention or disk I/O interference on the shared EC2 instance). This should be re-verified with a clean, isolated re-run before drawing firm conclusions about LoRA's typical per-epoch speed.
+
 ---
 
 # 18. Future Work
@@ -513,6 +532,7 @@ With additional computational resources and training time, the following experim
 8. Investigate the redundant-box behavior observed in some LoRA predictions.
 9. Compare LoRA with other parameter-efficient fine-tuning strategies.
 10. Perform multiple random seeds to determine whether the small mAP difference is statistically robust.
+11. Re-run LoRA training in isolation to confirm whether the epoch 6–7 slowdown recurs or was a one-off environmental artifact.
 
 ---
 
@@ -664,6 +684,6 @@ DOFA + Simple Feature Pyramid + Faster R-CNN
 + LoRA Fine-Tuning
 ```
 
-Under the constrained experimental setup, LoRA achieved slightly higher detection metrics while updating substantially fewer backbone parameters.
+Under the constrained experimental setup, LoRA achieved slightly higher detection metrics and slightly faster average training time while updating substantially fewer backbone parameters.
 
-The results demonstrate the feasibility of parameter-efficient adaptation of DOFA for downstream remote-sensing object detection, while also highlighting the need for larger-scale training and more extensive evaluation before drawing broader conclusions.
+The results demonstrate the feasibility of parameter-efficient adaptation of DOFA for downstream remote-sensing object detection, while also highlighting the need for larger-scale training, an isolated re-run to confirm the training-speed observation, and more extensive evaluation before drawing broader conclusions.
