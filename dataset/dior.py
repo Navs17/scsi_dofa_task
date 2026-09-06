@@ -19,9 +19,11 @@ NUM_CLASSES = len(DIOR_CLASSES) + 1  # +1 for background
 
 
 class DIORDetectionDataset(Dataset):
-    def __init__(self, hf_dataset_path: str, split: str, transforms=None):
+    def __init__(self, hf_dataset_path: str, split: str, transforms=None, max_samples: int = None):
         ds = load_from_disk(hf_dataset_path)
         self.data = ds[split]
+        if max_samples is not None and max_samples < len(self.data):
+            self.data = self.data.shuffle(seed=42).select(range(max_samples))
         self.transforms = transforms
 
     def __len__(self):

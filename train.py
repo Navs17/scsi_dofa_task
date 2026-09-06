@@ -25,7 +25,8 @@ def main(config_path):
     print(f"Using device: {device}")
 
     train_ds = DIORDetectionDataset(
-        cfg["dataset"]["hf_cache_path"], split="train"
+        cfg["dataset"]["hf_cache_path"], split="train",
+        max_samples=cfg["dataset"].get("max_samples"),
     )
     train_loader = DataLoader(
         train_ds,
