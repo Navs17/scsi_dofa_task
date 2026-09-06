@@ -1,10 +1,10 @@
 run_name: lora_finetune
 dataset:
-  hf_cache_path: /home/ec2-user/playground/navneet/scsi-dofa-task/data/DIOR/hf_cache
+  hf_cache_path: data/DIOR/hf_cache
   img_size: 512
   max_samples: 4000
 model:
-  dofa_checkpoint: /home/ec2-user/.cache/huggingface/hub/models--XShadow--DOFA/snapshots/7a5219e48d2f8848511b0fabea7920a8836bc480/DOFA_ViT_base_e100.pth
+  dofa_checkpoint: checkpoints/DOFA_ViT_base_e100.pth
   freeze_backbone: false
   use_lora: true
   lora_r: 8
@@ -17,4 +17,4 @@ train:
   weight_decay: 0.0001
   seed: 42
   log_every: 20
-  checkpoint_dir: /home/ec2-user/playground/navneet/scsi-dofa-task/experiments/lora
+  checkpoint_dir: experiments/lora
