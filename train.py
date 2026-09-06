@@ -41,6 +41,9 @@ def main(config_path):
         num_classes=NUM_CLASSES,
         img_size=cfg["dataset"]["img_size"],
         freeze_backbone=cfg["model"]["freeze_backbone"],
+        use_lora=cfg["model"].get("use_lora", False),
+        lora_r=cfg["model"].get("lora_r", 8),
+        lora_alpha=cfg["model"].get("lora_alpha", 16),
     )
     model.to(device)
 

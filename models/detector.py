@@ -2,15 +2,19 @@
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.ops import MultiScaleRoIAlign
-
+from models.lora import apply_lora_to_dofa_backbone
 from models.dofa_backbone import DOFASimpleFPNBackbone
 
 
 def build_dofa_faster_rcnn(checkpoint_path: str, num_classes: int, img_size: int = 800,
-                            freeze_backbone: bool = False):
+                            freeze_backbone: bool = False, use_lora: bool = False,
+                            lora_r: int = 8, lora_alpha: int = 16):
     backbone = DOFASimpleFPNBackbone(
         checkpoint_path, img_size=img_size, freeze_backbone=freeze_backbone
     )
+    
+    if use_lora:
+        backbone = apply_lora_to_dofa_backbone(backbone, r=lora_r, alpha=lora_alpha)
 
     # One anchor size per FPN level (4 levels: strides 4, 8, 16, 32),
     # each with 3 aspect ratios -- standard FPN/Faster R-CNN convention.
